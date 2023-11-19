@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dino Chrome Game</title>
+    <style>
+        #game-board {
+            width: 800px;
+            height: 400px;
+            border: 1px solid #ddd;
+            overflow: hidden;
+            position: relative;
+            margin: 0 auto; /* Zentriert das Spielfenster horizontal */
+        }
+
+        #dino {
+            width: 50px;
+            height: 50px;
+            background-color: #00f;
+            position: absolute;
+            bottom: 0;
+            left: 50px;
+            transition: bottom 0.3s;
+        }
+
+        .cactus {
+            width: 20px;
+            height: 50px;
+            background-color: #0f0;
+            position: absolute;
+            bottom: 0;
+            transition: left 0.1s;
+        }
+
+        #game-over-screen {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        #game-over-screen h2 {
+            color: #f00;
+        }
+
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+        #leaderboard {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            height: 300px; /* Ändere die Höhe der Rangliste nach Bedarf */
+            overflow: auto;
+            background-color: #f8f8f8;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        body.dark-mode #game-board {
+            background-color: #333;
+        }
+
+        body.dark-mode #score {
+            color: #fff;
+        }
+
+        #leaderboard ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #leaderboard li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Dino Chrome Game</h1>
+
+    <div id="game-board">
+        <div id="dino"></div>
+        <div id="score">Score: 0</div>
+        <div id="leaderboard">
+            <h2>Leaderboard</h2>
+            <ul id="leaderboard-list"></ul>
+        </div>
+        <div id="game-over-screen">
+            <h2>Game Over!</h2>
+            <p>Your score: <span id="final-score">0</span></p>
+            <p>Enter your name: <input type="text" id="player-name"></p>
+            <button id="submit-score">Submit Score</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const gameBoard = document.getElementById('game-board');
+            const dino = document.getElementById('dino');
+            const scoreDisplay = document.getElementById('score');
+            const leaderboardList = document.getElementById('leaderboard-list');
+            const gameOverScreen = document.getElementById('game-over-screen');
+            const finalScoreDisplay = document.getElementById('final-score');
+            const playerNameInput = document.getElementById('player-name');
+            const submitScoreButton = document.getElementById('submit-score');
+
+            let score = 0;
+            let isJumping = false;
+            let isGameRunning = false;
+
+            function jump() {
+                if (!isJumping && isGameRunning) {
+                    isJumping = true;
+                    dino.style.bottom = '100px';
+                    setTimeout(() => {
+                        dino.style.bottom = '0';
+                        isJumping = false;
+                    }, 300);
+                }
+            }
+
+            function startGame() {
+                isGameRunning = true;
+                updateLeaderboard(); // Initialisiere die Rangliste
+                createCactus();
+                document.addEventListener('keydown', handleKeyDown);
+            }
+
+            function createCactus() {
+                const cactus = document.createElement('div');
+                cactus.className = 'cactus';
+                cactus.style.left = '800px';
+                gameBoard.appendChild(cactus);
+
+                const moveCactus = setInterval(() => {
+                    const cactusPosition = parseInt(cactus.style.left);
+                    if (cactusPosition > 0) {
+                        cactus.style.left = (cactusPosition - 10) + 'px';
+                    } else {
+                        gameBoard.removeChild(cactus);
+                        clearInterval(moveCactus);
+                        if (isGameRunning) {
+                            createCactus();
+                            updateScore();
+                        }
+                    }
+
+                    if (
+                        dino.offsetLeft < cactus.offsetLeft + cactus.offsetWidth &&
+                        dino.offsetLeft + dino.offsetWidth > cactus.offsetLeft &&
+                        dino.offsetTop < cactus.offsetTop + cactus.offsetHeight &&
+                        dino.offsetTop + dino.offsetHeight > cactus.offsetTop
+                    ) {
+                        gameOver();
+                    }
+                }, 20);
+            }
+
+            function updateScore() {
+                if (isGameRunning) {
+                    score += 10;
+                    scoreDisplay.textContent = 'Score: ' + score;
+
+                    if (score % 400 === 0) {
+                        document.body.classList.toggle('dark-mode');
+                    }
+                }
+            }
+
+            function gameOver() {
+                isGameRunning = false;
+                finalScoreDisplay.textContent = score;
+                gameOverScreen.style.display = 'block';
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+
+            function handleKeyDown(event) {
+                if (event.code === 'Space') {
+                    jump();
+                }
+            }
+
+            submitScoreButton.addEventListener('click', function () {
+                const playerName = playerNameInput.value.trim();
+                if (playerName) {
+                    const playerData = { name: playerName, score: score };
+                    saveToLeaderboard(playerData);
+                    restartGame();
+                } else {
+                    alert('Please enter your name.');
+                }
+            });
+
+            function saveToLeaderboard(playerData) {
+                let leaderboard = JSON.parse(localStorage.getItem('dinoLeaderboard')) || [];
+                leaderboard.push(playerData);
+                leaderboard.sort((a, b) => b.score - a.score);
+                leaderboard = leaderboard.slice(0, 10);
+                localStorage.setItem('dinoLeaderboard', JSON.stringify(leaderboard));
+            }
+
+            function updateLeaderboard() {
+                const leaderboard = JSON.parse(localStorage.getItem('dinoLeaderboard')) || [];
+
+                leaderboardList.innerHTML = '';
+
+                leaderboard.forEach((player, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = `${index + 1}. ${player.name}: ${player.score}`;
+                    leaderboardList.appendChild(listItem);
+                });
+            }
+
+            function restartGame() {
+                score = 0;
+                scoreDisplay.textContent = 'Score: ' + score;
+                document.body.classList.remove('dark-mode');
+                gameOverScreen.style.display = 'none';
+                while (gameBoard.firstChild) {
+                    gameBoard.removeChild(gameBoard.firstChild);
+                }
+                startGame();
+            }
+
+            // Starte das Spiel, wenn die Leertaste gedrückt wird
+            document.addEventListener('keydown', function (event) {
+                if (event.code === 'Space' && !isGameRunning) {
+                    startGame();
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
